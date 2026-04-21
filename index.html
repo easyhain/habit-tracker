@@ -2,175 +2,242 @@
 <html lang="hi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-Student Report Tool</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <title>EasyHain Habit Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; padding: 5px; background: #fff; margin: 0; }
-        .setup-box { background: #f0f0f0; padding: 10px; border: 1px solid #333; margin-bottom: 15px; border-radius: 5px; }
-        .student-list-table { border-collapse: collapse; margin: 10px 0; background: white; width: 100%; max-width: 500px; }
-        .student-list-table th, .student-list-table td { border: 1px solid #999; padding: 5px; font-size: 13px; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f4f9; margin: 10px; }
         
-        .btn { padding: 8px 15px; font-size: 13px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: bold; margin: 5px 2px; }
-        .btn-setup { background-color: #3498db; }
-        .btn-gen { background-color: #2ecc71; }
-        .btn-pdf { background-color: #e74c3c; }
-        
-        /* PDF Layout: Ek page par do result ke liye */
-        #all-results-container { 
+        .wrapper { 
+            background:  white; 
+            padding: 15px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: inline-block;
+            min-width: 100%;
+        }
+
+        .controls { 
             display: flex; 
-            flex-wrap: wrap; 
-            gap: 20px; 
-            justify-content: center;
+            gap: 15px; 
+            margin-bottom: 20px; 
+            padding: 10px; 
+            background: #fff; 
+            border-radius: 8px;
         }
 
-        .result-wrapper { 
-            width: 98%; /* Landscape mein do table ke liye perfect size */
-            padding: 10px 0; 
-            border-bottom: 1px dashed #aaa;
-            page-break-inside: avoid; /* Table beech mein se na kate */
+        .table-container {
+            overflow-x: auto;
+            width: 100%;
         }
 
-        .table-container { width: 100%; overflow-x: auto; margin-bottom: 5px; }
-        table { border-collapse: collapse; width: 100%; border: 1.5px solid #000; }
-        th, td { border: 1px solid #000; padding: 2px 1px; text-align: center; font-size: 10px; font-weight: bold; }
-        .subject-col { white-space: nowrap; text-align: left; padding-left: 3px; background: #f9f9f9; width: 1%; }
-        .header-row { background: #d1d1d1; }
-        .total-row { background: #e3f2fd; }
-        .final-col { background: #fff3e0; width: 30px; }
-        .student-info-header { text-align: left; margin-bottom: 3px; font-size: 12px; background: #eee; padding: 4px; border-left: 4px solid #333; }
+        table { 
+            border-collapse: collapse; 
+            width: max-content; 
+            table-layout: auto; 
+            border: 2px solid #333;
+        }
 
-        .no-print { display: block; }
-        @media print { .no-print { display: none !important; } }
+        th, td { 
+            border: 1px solid #ccc; 
+            padding: 8px 12px; 
+            text-align: center; 
+            white-space: nowrap; 
+        }
+
+        th { background: #eef2f3; font-size: 14px; }
+
+        .col-habit { width: 200px; min-width: 200px; text-align: left; background: #f9f9f9; position: sticky; left: 0; z-index: 2; border-right: 2px solid #333; }
+        .col-date { width: 45px; min-width: 45px; }
+        .col-analysis { width: 280px; min-width: 280px; padding: 0; }
+
+        .analysis-table { width: 100%; border-collapse: collapse; }
+        .analysis-table td { padding: 5px; border: none; border-right: 1px solid #eee; }
+        
+        .progress-bg { width: 100px; background: #eee; height: 18px; border: 1px solid #999; }
+        .progress-fill { height: 100%; background: #2d6a4f; transition: width 0.4s; }
+
+        #chartWrapper { 
+            width: calc(45.8* 45px + 62px); 
+            height: 500px; 
+            margin-top: 5px;
+            margin-left: 240px; 
+            background: #fff;
+            border: 2px solid #ccc;
+            border-top: none;
+        }
+
+        button { padding: 8px 15px; cursor: pointer; border-radius: 5px; border: none; font-weight: bold; }
+        .btn-create { background: #007bff; color: white; }
+        .btn-save { background: #28a745; color: white; }
+        .btn-load { background: #ffc107; }
+        /* Naya Button Style */
+        .btn-clear { background: #d90429; color: white; } 
     </style>
 </head>
 <body>
 
-<div id="setup-container" class="setup-box no-print">
-    <h3>1. Student Setup</h3>
-    <label>छात्रों की संख्या: </label>
-    <input type="number" id="student-count" min="1" value="1" style="width: 50px;">
-    <button class="btn btn-setup" onclick="createStudentList()">लिस्ट तैयार करें</button>
+<div class="wrapper">
+    <div class="controls">
+        <b style="font-size: 20px; color: #1a73e8;">EasyHain habit tracker</b>
+        Habits: <input type="number" id="habitCount" value="5" style="width:50px; padding: 5px;">
+        <button class="btn-create" onclick="initTracker()">Naya Banaye</button>
+        <button class="btn-clear" onclick="clearAllTicks()">Clear All Ticks</button>
+        <button class="btn-save" onclick="downloadData()">Save File</button>
+        <button class="btn-load" onclick="document.getElementById('fileInput').click()">Load File</button>
+        <input type="file" id="fileInput" style="display:none" onchange="uploadData(event)">
+    </div>
 
-    <div id="list-area"></div>
-    <div id="action-area" style="display:none; text-align: center; margin-top: 15px;">
-        <button class="btn btn-gen" onclick="generateAllResults()">1. रिजल्ट देखें</button>
-        <button id="pdf-btn" class="btn btn-pdf" style="display:none;" onclick="downloadPDF()">2. PDF डाउनलोड करें</button>
+    <div class="table-container">
+        <table id="mainTable">
+            <thead>
+                <tr>
+                    <th class="col-habit" rowspan="2">Habit Name</th>
+                    <th colspan="31">Days of Month</th>
+                    <th class="col-analysis" rowspan="2">Analysis (Goal: 31)</th>
+                </tr>
+                <tr id="dateRow"></tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+
+        <div id="chartWrapper">
+            <canvas id="mainChart"></canvas>
+        </div>
     </div>
 </div>
 
-<div id="pdf-content">
-    <div id="all-results-container"></div>
-</div>
-
 <script>
-window.addEventListener('beforeunload', function (e) {
-    e.preventDefault();
-    e.returnValue = 'डेटा मिट जाएगा!';
-});
+    let habitsData = JSON.parse(localStorage.getItem('easyHain_free')) || [];
+    let myChart = null;
 
-const months = ["jul", "aug", "oct", "nov", "jan", "feb"];
-const subjects = ["हिन्दी", "अंग्रेजी", "सस्कृत/उर्दू", "गणित", "विज्ञान", "सामाजिक विज्ञान", "कला शिक्षा", "शारीरिक शिक्षा", "कार्यानुभव"];
-
-function createStudentList() {
-    const count = document.getElementById('student-count').value;
-    let html = `<table class="student-list-table"><tr style="background:#ddd"><th>Roll</th><th>Name</th><th>Target %</th></tr>`;
-    for(let i=1; i<=count; i++) {
-        html += `<tr>
-            <td><input type="number" id="roll-${i}" value="${i}" style="width:35px"></td>
-            <td><input type="text" id="name-${i}" placeholder="नाम" style="width:140px"></td>
-            <td><input type="number" id="tper-${i}" value="75" style="width:45px"></td>
-        </tr>`;
+    function initTracker() {
+        const count = parseInt(document.getElementById('habitCount').value);
+        if(habitsData.length !== count) {
+            habitsData = Array.from({length: count}, (_, i) => ({
+                name: habitsData[i]?.name || `Habit ${i+1}`,
+                days: habitsData[i]?.days || Array(32).fill(false)
+            }));
+        }
+        render();
     }
-    html += `</table>`;
-    document.getElementById('list-area').innerHTML = html;
-    document.getElementById('action-area').style.display = 'block';
-}
 
-function getGrade(p) {
-    if (p >= 91) return "A+"; if (p >= 81) return "A"; if (p >= 71) return "B+";
-    if (p >= 61) return "B"; if (p >= 51) return "C+"; if (p >= 41) return "C";
-    if (p >= 33) return "D"; return "E";
-}
-
-function generateAllResults() {
-    const count = document.getElementById('student-count').value;
-    const container = document.getElementById('all-results-container');
-    container.innerHTML = ""; 
-
-    for(let i=1; i<=count; i++) {
-        const roll = document.getElementById(`roll-${i}`).value;
-        const name = document.getElementById(`name-${i}`).value || "N/A";
-        const target = parseFloat(document.getElementById(`tper-${i}`).value) || 75;
-
-        let studentDiv = document.createElement('div');
-        studentDiv.className = "result-wrapper";
-        
-        let header = `<div class="student-info-header"><b>Roll No:</b> ${roll} | <b>Name:</b> ${name}</div>`;
-        
-        let tableHtml = `<div class="table-container"><table>
-            <tr class="header-row">
-                <th rowspan="2" class="subject-col">विषय</th>
-                ${months.map(m => `<th colspan="4">${getMonthHindi(m)}</th>`).join('')}
-                <th class="final-col">कुल</th>
-            </tr>
-            <tr class="header-row">
-                ${months.map(() => `<th>लि.</th><th>प्र.</th><th>योग</th><th>ग्र.</th>`).join('')}
-                <th class="final-col">वार्षिक</th>
-            </tr>`;
-
-        let grandTotal = 0;
-        let monthlyTotals = months.map(() => 0);
-
-        subjects.forEach((sub, sIdx) => {
-            tableHtml += `<tr><td class="subject-col">${sub}</td>`;
-            let rowSum = 0;
-            months.forEach((m, mIdx) => {
-                let factor = (target/100) + (Math.random() * 0.4 - 0.2);
-                factor = Math.max(0, Math.min(1, factor));
-                let l = Math.round(20 * factor);
-                let p = Math.round(5 * factor);
-                let y = l + p;
-                rowSum += y;
-                monthlyTotals[mIdx] += y;
-                tableHtml += `<td>${l}</td><td>${p}</td><td>${y}</td><td>${getGrade((y/25)*100)}</td>`;
+    // Saare ticks clear karne ka function
+    function clearAllTicks() {
+        if(confirm("Kya aap saare ticks hatana chahte hain?")) {
+            habitsData.forEach(habit => {
+                habit.days = Array(32).fill(false);
             });
-            tableHtml += `<td class="final-col">${rowSum}</td></tr>`;
-            grandTotal += rowSum;
+            render();
+        }
+    }
+
+    function render() {
+        const dateRow = document.getElementById('dateRow');
+        const body = document.getElementById('tableBody');
+
+        let dHtml = '';
+        for(let i=1; i<=31; i++) dHtml += `<th class="col-date">${i}</th>`;
+        dateRow.innerHTML = dHtml;
+
+        body.innerHTML = '';
+        habitsData.forEach((habit, idx) => {
+            const actual = habit.days.filter(x => x === true).length;
+            const pct = (actual / 31) * 100;
+
+            let tr = document.createElement('tr');
+            let html = `<td class="col-habit"><input style="width:90%; border:none; font-size:14px; background:transparent;" value="${habit.name}" onchange="updateName(${idx}, this.value)"></td>`;
+            
+            for(let d=1; d<=31; d++) {
+                html += `<td class="col-date"><input type="checkbox" style="width:18px; height:18px" ${habit.days[d] ? 'checked' : ''} onclick="toggle(${idx}, ${d})"></td>`;
+            }
+
+            html += `<td class="col-analysis">
+                <table class="analysis-table">
+                    <tr>
+                        <td width="50px"><b>${actual}</b></td>
+                        <td>
+                            <div class="progress-bg"><div class="progress-fill" id="bar_${idx}" style="width:${pct}%"></div></div>
+                        </td>
+                    </tr>
+                </table>
+            </td>`;
+            
+            tr.innerHTML = html;
+            body.appendChild(tr);
         });
 
-        tableHtml += `<tr class="total-row"><td class="subject-col">कुल योग</td>`;
-        monthlyTotals.forEach(mSum => tableHtml += `<td colspan="2">योग:</td><td colspan="2">${mSum}</td>`);
-        tableHtml += `<td class="final-col">${grandTotal}</td></tr>`;
-
-        tableHtml += `<tr class="total-row"><td class="subject-col">प्रतिशत</td>`;
-        monthlyTotals.forEach(mSum => tableHtml += `<td colspan="4">${((mSum/225)*100).toFixed(0)}%</td>`);
-        tableHtml += `<td class="final-col">${((grandTotal/1350)*100).toFixed(1)}%</td></tr>`;
-
-        tableHtml += `</table></div>`;
-        studentDiv.innerHTML = header + tableHtml;
-        container.appendChild(studentDiv);
+        updateChart();
+        save();
     }
-    document.getElementById('pdf-btn').style.display = 'inline-block';
-}
 
-function downloadPDF() {
-    const element = document.getElementById('pdf-content');
-    const opt = {
-        margin:       [0.3, 0.2],
-        filename:     'Class_Report_2026.pdf',
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2 },
-        jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' },
-        pagebreak:    { mode: ['avoid-all'] } // Z जबरदस्ती पेज ब्रेक नहीं करेगा
+    function toggle(hIdx, day) {
+        habitsData[hIdx].days[day] = !habitsData[hIdx].days[day];
+        render();
+    }
+
+    function updateName(idx, val) {
+        habitsData[idx].name = val;
+        save();
+    }
+
+    function updateChart() {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        const dailyData = Array(31).fill(0);
+        for(let d=1; d<=31; d++) {
+            habitsData.forEach(h => { if(h.days[d]) dailyData[d-1]++; });
+        }
+
+        if(myChart) myChart.destroy();
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: 31}, (_, i) => i + 1),
+                datasets: [{
+                    data: dailyData,
+                    borderColor: '#1a73e8',
+                    backgroundColor: 'rgba(26, 115, 232, 0.2)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: { padding: { left: 10, right: 10 } },
+                scales: { 
+                    y: { beginAtZero: true, max: habitsData.length || 5, ticks: { stepSize: 1, display: false }, grid: { display: false } },
+                    x: { grid: { display: true }, ticks: { font: { size: 10 } } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    function save() { localStorage.setItem('easyHain_free', JSON.stringify(habitsData)); }
+
+    function downloadData() {
+        const blob = new Blob([JSON.stringify(habitsData)], {type: 'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'habit_tracker_backup.json';
+        a.click();
+    }
+
+    function uploadData(event) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            habitsData = JSON.parse(e.target.result);
+            document.getElementById('habitCount').value = habitsData.length;
+            render();
+        };
+        reader.readAsText(event.target.files[0]);
+    }
+
+    window.onload = () => {
+        if(habitsData.length > 0) document.getElementById('habitCount').value = habitsData.length;
+        initTracker();
     };
-    html2pdf().set(opt).from(element).save();
-}
-
-function getMonthHindi(m) {
-    const map = {jul:"जुलाई", aug:"अगस्त", oct:"अक्टूबर", nov:"नवम्बर", jan:"जनवरी", feb:"फरवरी"};
-    return map[m];
-}
 </script>
 
 </body>
